@@ -137,40 +137,47 @@ public class TextAsyncLayer: CALayer {
                 return
             }
             
-            TextAsyncLayerGetDisplayQueue().async(execute: {
+            TextAsyncLayerGetDisplayQueue().async(execute: { [weak self] in
+                guard let self else { return }
                 if isCancelled() {
                     return
                 }
-                UIGraphicsBeginImageContextWithOptions(size, _: tmpopaque, _: scale)
-                let context = UIGraphicsGetCurrentContext()
-                if tmpopaque && context != nil {
-                    context?.saveGState()
-                    do {
-                        if tmpbackgroundColor != nil || tmpbackgroundColor!.alpha < 1 {
-                            context?.setFillColor(UIColor.white.cgColor)
-                            context?.addRect(CGRect(x: 0, y: 0, width: size.width * scale, height: size.height * scale))
-                            context?.fillPath()
-                        }
-                        if tmpbackgroundColor != nil {
-                            context?.setFillColor(tmpbackgroundColor!)
-                            context?.addRect(CGRect(x: 0, y: 0, width: size.width * scale, height: size.height * scale))
-                            context?.fillPath()
-                        }
-                    }
-                    context?.restoreGState()
+                
+                let format = UIGraphicsImageRendererFormat()
+                format.opaque = self.isOpaque
+                format.scale = contentsScale
+                let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
+                let image: UIImage? = renderer.image(actions: { [weak self] rendererContext in
+                    guard let self else { return }
+                let context = rendererContext.cgContext
+                if self.isOpaque {
+                var size: CGSize = bounds.size
+                size.width *= contentsScale
+                size.height *= contentsScale
+                context.saveGState()
+                do {
+                if self.backgroundColor == nil || self.backgroundColor!.alpha < 1 {
+                context.setFillColor(UIColor.white.cgColor)
+                context.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+                context.fillPath()
                 }
-                task?.display!(context, size, isCancelled)
-                if isCancelled() {
-                    UIGraphicsEndImageContext()
-                    DispatchQueue.main.async(execute: {
-                        if ((task?.didDisplay) != nil) {
-                            task?.didDisplay!(self, false)
-                        }
-                    })
-                    return
+                if self.backgroundColor != nil {
+                context.setFillColor(self.backgroundColor!)
+                context.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+                context.fillPath()
                 }
-                let image: UIImage? = UIGraphicsGetImageFromCurrentImageContext()
-                UIGraphicsEndImageContext()
+                }
+                context.restoreGState()
+                }
+                task?.display!(context, bounds.size, {
+                return false
+                })
+                })
+                self.contents = image?.cgImage
+                if task?.didDisplay != nil {
+                task?.didDisplay!(self, true)
+                }
+                
                 if isCancelled() {
                     DispatchQueue.main.async(execute: {
                         if ((task?.didDisplay) != nil) {
@@ -197,33 +204,40 @@ public class TextAsyncLayer: CALayer {
             if task?.willDisplay != nil {
                 task?.willDisplay!(self)
             }
-            UIGraphicsBeginImageContextWithOptions(bounds.size, _: self.isOpaque, _: contentsScale)
-            let context = UIGraphicsGetCurrentContext()
-            if self.isOpaque && context != nil {
-                var size: CGSize = bounds.size
-                size.width *= contentsScale
-                size.height *= contentsScale
-                context?.saveGState()
-                do {
-                    if self.backgroundColor == nil || self.backgroundColor!.alpha < 1 {
-                        context?.setFillColor(UIColor.white.cgColor)
-                        context?.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
-                        context?.fillPath()
-                    }
-                    if self.backgroundColor != nil {
-                        context?.setFillColor(self.backgroundColor!)
-                        context?.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
-                        context?.fillPath()
-                    }
-                }
-                context?.restoreGState()
+            let format = UIGraphicsImageRendererFormat()
+            format.opaque = self.isOpaque
+            format.scale = contentsScale
+            let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
+            let image: UIImage? = renderer.image(actions: { [weak self] rendererContext in
+                guard let self else { return }
+            let context = rendererContext.cgContext
+            if self.isOpaque {
+            var size: CGSize = bounds.size
+            size.width *= contentsScale
+            size.height *= contentsScale
+            context.saveGState()
+            do {
+            if self.backgroundColor == nil || self.backgroundColor!.alpha < 1 {
+            context.setFillColor(UIColor.white.cgColor)
+            context.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+            context.fillPath()
+            }
+            if self.backgroundColor != nil {
+            context.setFillColor(self.backgroundColor!)
+            context.addRect(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+            context.fillPath()
+            }
+            }
+            context.restoreGState()
             }
             task?.display!(context, bounds.size, {
-                return false
+            return false
             })
-            
-            let image: UIImage? = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
+            })
+            self.contents = image?.cgImage
+            if task?.didDisplay != nil {
+            task?.didDisplay!(self, true)
+            }
             contents = image?.cgImage
             if task?.didDisplay != nil {
                 task?.didDisplay!(self, true)
